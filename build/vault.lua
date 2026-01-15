@@ -29,6 +29,13 @@ OrderBookReq = {}
 
 
 
+
+
+
+
+
+
+
 SupportedTokens = SupportedTokens or {}
 OrderBooks = OrderBooks or {}
 
@@ -37,10 +44,6 @@ Balances = Balances or {}
 
 local function isOwner(sender)
    return sender == Owner
-end
-
-local function isAuthority(sender)
-   return sender == Marketplace
 end
 
 local function addAuthority(id)
@@ -98,4 +101,12 @@ local function tagOrField(msg, name)
       return value
    end
    return msg[name]
+end
+
+local function requireSupportedToken(address)
+   assert(SupportedTokens[address], "token not supported")
+end
+
+local function requireSupportedOrderBook(address)
+   assert(OrderBooks[address], "orderbook not supported")
 end

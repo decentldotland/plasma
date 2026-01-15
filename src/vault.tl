@@ -21,12 +21,19 @@ global record OrderBookReq
     token_b: string
 end
 
+local record Tag
+    name: string | nil
+    Name: string | nil
+    value: string | nil
+    Value: string | nil
+end
+
 local record Msg
-  From: string
-  Id: string | nil
-  Tags: any
-  TagArray: any
-  reply: ReplyFn | nil
+    From: string
+    Id: string | nil
+    Tags: {Tag} | {string: string} | nil
+    TagArray: {Tag} | nil
+    reply: ReplyFn | nil
 end
 
 global SupportedTokens: {string: TokenReq} = SupportedTokens or {}
@@ -39,11 +46,7 @@ local function isOwner(sender: string): boolean
   return sender == Owner
 end
 
-local function isAuthority(sender: string) : boolean
-  return sender == Marketplace
-end
-
-local function addAuthority(id: string)
+local function addAuthority(id: string): nil
   local a = ao.authorities or {}
   for _, v in ipairs(a) do
     if v == id then return end
@@ -64,11 +67,11 @@ local function respond(msg: Msg, payload: Payload)
   end
 end
 
-local function getMsgId(msg): string
+local function getMsgId(msg: Msg): string | nil
     return msg.Id
 end
 
-local function findTagValue(tags, name: string): string | nil
+local function findTagValue(tags: {Tag} | nil, name: string): string | nil
   if not tags then
     return nil
   end
@@ -98,4 +101,12 @@ local function tagOrField(msg: Msg, name: string): string | nil
     return value
   end
   return msg[name]
+end
+
+local function requireSupportedToken(address: string)
+    assert(SupportedTokens[address], "token not supported")
+end
+
+local function requireSupportedOrderBook(address: string)
+    assert(OrderBooks[address], "orderbook not supported")
 end
