@@ -1,0 +1,10 @@
+{
+  "Lua.runtime.version": "Lua51",
+  "Lua.diagnostics.globals": [
+    "Send",
+    "Handlers"
+  ],
+  "files.associations": {
+    "*.tl": "lua"
+  }
+}
