@@ -178,7 +178,7 @@ Handlers.add("vault.configure",
   function(msg: Msg)
     assert(isOwner(msg.From), "Unauthorized")
     Name =  tagOrField(msg, "Name") or Name
-    Identifier = fintagOrFielddTagValue(msg, "Identifier") or Identifier
+    Identifier = tagOrField(msg, "Identifier") or Identifier
     Variant = tagOrField(msg, "Variant") or Variant
     emitVaultConfigurationPatch()
 
@@ -191,3 +191,34 @@ Handlers.add("vault.configure",
 
   end
 )
+
+Handlers.add("vault.add_token_support",
+  Handlers.utils.hasMatchingTag("Action", "AddTokenSupport"),
+  function(msg: Msg)
+    assert(isOwner(msg.From), "Unauthorized")
+    local token = tagOrField(msg, "TokenAddress")
+    assert(token ~= nil and token ~= "", "token address must be valid ao process id")
+    assert(not SupportedTokens[token], "token is already supported")
+    local name = tagOrField(msg, "TokenName")
+    local decimals = tagOrField(msg, "TokenDecimals")
+
+    assert(name ~= nil and name ~= "", "token name cannot be nil")
+    assert(decimals ~= nil and decimals ~= "" and tonumber(decimals) > 0, "decimals cannot be negative")
+
+    SupportedTokens[token] = {
+      address = token,
+      name = name,
+      decimals = tonumber(decimals)
+    }
+
+    addAuthority(token)
+    emitVaultConfigurationPatch()
+
+    respond(msg, {
+      Action = "AddTokenSupport-OK",
+      TokenAddress = token,
+      TokenName = name,
+      TokenDecimals = tonumber(decimals),
+    })
+  end
+  )
