@@ -124,6 +124,10 @@ local function requireSupportedOrderBook(address)
    assert(OrderBooks[address], "orderbook not supported")
 end
 
+local function validateArweaveAddress(address)
+   assert(address ~= nil and address ~= "", "token address must be valid ao process id")
+end
+
 local function requireOrderbookTokenAuth(orderbook_address, token_address)
    requireSupportedToken(token_address)
    local ob = OrderBooks[orderbook_address]
@@ -197,7 +201,7 @@ Handlers.utils.hasMatchingTag("Action", "AddTokenSupport"),
 function(msg)
    assert(isOwner(msg.From), "Unauthorized")
    local token = tagOrField(msg, "TokenAddress")
-   assert(token ~= nil and token ~= "", "token address must be valid ao process id")
+   validateArweaveAddress(token)
    assert(not SupportedTokens[token], "token is already supported")
    local name = tagOrField(msg, "TokenName")
    local decimals = tagOrField(msg, "TokenDecimals")
@@ -219,5 +223,45 @@ function(msg)
       TokenAddress = token,
       TokenName = name,
       TokenDecimals = tonumber(decimals),
+   })
+end)
+
+
+Handlers.add("vault.add_orderbook", Handlers.utils.hasMatchingTag("Action", "AddOrderbook"),
+function(msg)
+   assert(isOwner(msg.From), "unauthorized")
+   local token_a = tagOrField(msg, "TokenA")
+   local token_b = tagOrField(msg, "TokenB")
+   local address = tagOrField(msg, "OrderbookAddress")
+   local fee_bps = tagOrField(msg, "FeeBps")
+
+   validateArweaveAddress(token_a)
+   validateArweaveAddress(token_b)
+   validateArweaveAddress(address)
+   requireSupportedToken(token_a)
+   requireSupportedToken(token_b)
+   assert(token_a ~= token_b, "token_a and token_b must differ")
+   assert(not OrderBooks[address], "orderbook already supported")
+   assert(fee_bps ~= nil and fee_bps ~= "" and tonumber(fee_bps) >= 0, "invalid fee_bps param")
+
+   OrderBooks[address] = {
+      tokens = {
+         [token_a] = true,
+         [token_b] = true,
+      },
+
+      active = true,
+      fee_bps = tonumber(fee_bps),
+   }
+
+   addAuthority(address)
+   emitVaultConfigurationPatch()
+
+   respond(msg, {
+      Action = "AddOrderbook-OK",
+      TokenA = token_a,
+      TokenB = token_b,
+      OrderbookAddress = address,
+      FeeBps = tonumber(fee_bps),
    })
 end)
