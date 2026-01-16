@@ -249,7 +249,6 @@ function(msg)
          [token_a] = true,
          [token_b] = true,
       },
-
       active = true,
       fee_bps = tonumber(fee_bps),
    }
@@ -263,5 +262,40 @@ function(msg)
       TokenB = token_b,
       OrderbookAddress = address,
       FeeBps = tonumber(fee_bps),
+   })
+end)
+
+
+Handlers.add("vault.configure_orderbook",
+Handlers.utils.hasMatchingTag("Action", "ConfigureOrderbook"),
+function(msg)
+
+   assert(isOwner(msg.From), "Unauthorized")
+   local orderbook_address = tagOrField(msg, "OrderbookAddress")
+   local fee_bps = tagOrField(msg, "FeeBps") or nil
+   local active = tagOrField(msg, "Active") or nil
+
+   validateArweaveAddress(orderbook_address)
+   requireSupportedOrderBook(orderbook_address)
+
+   if fee_bps ~= nil then
+      assert(fee_bps ~= nil and fee_bps ~= "" and tonumber(fee_bps) >= 0, "invalid fee_bps param")
+      OrderBooks[orderbook_address].fee_bps = tonumber(fee_bps)
+   end
+
+   if active ~= nil then
+      local status_bool = string.tolower(active) == "true"
+      OrderBooks[orderbook_address].active = status_bool
+   end
+
+   emitVaultConfigurationPatch()
+
+   local ob = OrderBooks[orderbook_address]
+
+   respond(msg, {
+      Action = "ConfigureOrderbook-OK",
+      FeeBps = ob.fee_bps,
+      Active = ob.active,
+      OrderbookAddress = orderbook_address,
    })
 end)
