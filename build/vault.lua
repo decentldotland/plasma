@@ -71,6 +71,17 @@ local function addAuthority(id)
    end
 end
 
+local function removeAuthority(id)
+   local a = ao.authorities or {}
+   for i = #a, 1, -1 do
+      if a[i] == id then
+         table.remove(a, i)
+      end
+   end
+   ao.authorities = a
+   if SyncState then SyncState(nil) end
+end
+
 local function respond(msg, payload)
    if msg.reply then
       msg.reply(payload)
@@ -265,7 +276,6 @@ function(msg)
    })
 end)
 
-
 Handlers.add("vault.configure_orderbook",
 Handlers.utils.hasMatchingTag("Action", "ConfigureOrderbook"),
 function(msg)
@@ -286,6 +296,9 @@ function(msg)
    if active ~= nil then
       local status_bool = string.tolower(active) == "true"
       OrderBooks[orderbook_address].active = status_bool
+      if not status_bool then
+         removeAuthority(orderbook_address)
+      end
    end
 
    emitVaultConfigurationPatch()
