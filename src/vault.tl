@@ -17,6 +17,17 @@ end
 
 global record OrderBookReq
   tokens: {string: boolean}
+  active: boolean
+  fee_bps: string
+end
+
+global record OrderEscrowReq
+  user: string
+  token: string
+  amount: string
+  filled: string
+  side: string
+  orderbook: string
 end
 
 local record Tag
@@ -35,11 +46,13 @@ local record Msg
 end
 
 global SupportedTokens: {string: TokenReq} = SupportedTokens or {}
--- orderboo address -> {[token_a] = true, [token_b] = true}
+-- orderbook address -> tokens = {token_a] = true, [token_b] = true}
 global OrderBooks: {string: OrderBookReq} = OrderBooks or {}
 -- user address -> token address -> balance
 global AvailableBalances: {string: {string: Balance}} = AvailableBalances or {}
 global LockedBalances: {string: {string: Balance}} = LockedBalances or {}
+-- order_id -> OrderEscrowReq
+global OrderEscrow: {string: OrderEscrowReq} = OrderEscrow or {}
 global Send: function(Payload): nil
 
 local function isOwner(sender: string): boolean

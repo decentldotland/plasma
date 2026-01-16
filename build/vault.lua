@@ -21,6 +21,17 @@ OrderBookReq = {}
 
 
 
+OrderEscrowReq = {}
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -40,6 +51,8 @@ OrderBooks = OrderBooks or {}
 
 AvailableBalances = AvailableBalances or {}
 LockedBalances = LockedBalances or {}
+
+OrderEscrow = OrderEscrow or {}
 
 
 local function isOwner(sender)
