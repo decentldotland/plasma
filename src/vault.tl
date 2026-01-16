@@ -71,6 +71,17 @@ local function addAuthority(id: string): nil
   end
 end
 
+local function removeAuthority(id: string): nil
+    local a = ao.authorities or {}
+    for i = #a, 1, -1 do
+      if a[i] == id then
+        table.remove(a, i)
+      end
+    end
+    ao.authorities = a
+    if SyncState then SyncState(nil) end
+end
+
 local function respond(msg: Msg, payload: Payload)
   if msg.reply then
     msg.reply(payload)
@@ -265,7 +276,6 @@ Handlers.add("vault.add_orderbook", Handlers.utils.hasMatchingTag("Action", "Add
     })
   end
   )
-
 Handlers.add("vault.configure_orderbook", 
   Handlers.utils.hasMatchingTag("Action", "ConfigureOrderbook"),
   function(msg: Msg)
@@ -286,6 +296,9 @@ Handlers.add("vault.configure_orderbook",
     if active ~= nil then
       local status_bool = string.tolower(active) == "true"
       OrderBooks[orderbook_address].active = status_bool
+      if not status_bool then
+        removeAuthority(orderbook_address)
+      end
     end
 
     emitVaultConfigurationPatch()
