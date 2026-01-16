@@ -15,6 +15,7 @@ TokenReq = {}
 
 
 
+
 OrderBookReq = {}
 
 
@@ -131,6 +132,10 @@ local function requireSupportedToken(address)
    assert(SupportedTokens[address], "token not supported")
 end
 
+local function requireActiveToken(address)
+   assert(SupportedTokens[address] and SupportedTokens[address].active, "token not supported")
+end
+
 local function requireSupportedOrderBook(address)
    assert(OrderBooks[address], "orderbook not supported")
 end
@@ -224,6 +229,7 @@ function(msg)
       address = token,
       name = name,
       decimals = tonumber(decimals),
+      active = true,
    }
 
    addAuthority(token)
@@ -233,6 +239,7 @@ function(msg)
       Action = "AddTokenSupport-OK",
       TokenAddress = token,
       TokenName = name,
+      Active = true,
       TokenDecimals = tonumber(decimals),
    })
 end)
@@ -249,8 +256,8 @@ function(msg)
    validateArweaveAddress(token_a)
    validateArweaveAddress(token_b)
    validateArweaveAddress(address)
-   requireSupportedToken(token_a)
-   requireSupportedToken(token_b)
+   requireActiveToken(token_a)
+   requireActiveToken(token_b)
    assert(token_a ~= token_b, "token_a and token_b must differ")
    assert(not OrderBooks[address], "orderbook already supported")
    assert(fee_bps ~= nil and fee_bps ~= "" and tonumber(fee_bps) >= 0, "invalid fee_bps param")
@@ -311,4 +318,44 @@ function(msg)
       Active = ob.active,
       OrderbookAddress = orderbook_address,
    })
+end)
+
+
+Handlers.add("vault.configure_token",
+Handlers.utils.hasMatchingTag("Action", "ConfigureToken"),
+function(msg)
+
+   assert(isOwner(msg.From), "unauthorized")
+   local token_address = tagOrField(msg, "TokenAddress")
+   local token_name = tagOrField(msg, "TokenName")
+   local token_decimals = tagOrField(msg, "TokenDecimals")
+   local token_active = tagOrField(msg, "TokenActive")
+
+   assert(token_address ~= nil and token_address ~= "", "TokenAddress required")
+   validateArweaveAddress(token_address)
+   requireSupportedToken(token_address)
+
+   if token_name ~= nil and token_name ~= "" then
+      SupportedTokens[token_address].name = token_name
+   end
+
+   if token_decimals ~= nil and tonumber(token_decimals) > 0 then
+      SupportedTokens[token_address].decimals = tonumber(token_decimals)
+   end
+
+   if token_active == "true" or token_active == "false" then
+      SupportedTokens[token_address].active = token_active == "true"
+   end
+
+   emitVaultConfigurationPatch()
+
+   local token = SupportedTokens[token_address]
+
+   respond(msg, {
+      Action = "ConfigureToken-OK",
+      Name = token.name,
+      Active = token.active,
+      Decimals = token.decimals,
+   })
+
 end)
