@@ -7,7 +7,7 @@ Balance = {}
 
 Variant = "0.1.0"
 Name = Name or nil
-Identifer = Identifer or nil
+Identifier = Identifier or nil
 
 TokenReq = {}
 
@@ -34,9 +34,8 @@ OrderBookReq = {}
 
 
 
-
-
 SupportedTokens = SupportedTokens or {}
+
 OrderBooks = OrderBooks or {}
 
 AvailableBalances = AvailableBalances or {}
@@ -114,7 +113,8 @@ end
 
 local function requireOrderbookTokenAuth(orderbook_address, token_address)
    requireSupportedToken(token_address)
-   assert(OrderBooks[orderbook_address][token_address], "orderbook is not authorized to handle this token")
+   local ob = OrderBooks[orderbook_address]
+   assert(ob and ob.tokens and ob.tokens[token_address], "orderbook is not authorized to handle this token")
 end
 
 

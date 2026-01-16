@@ -7,7 +7,7 @@ local type ReplyFn = function(Payload): nil
 
 global Variant: string = "0.1.0"
 global Name: string | nil = Name or nil
-global Identifer: string = Identifer or nil 
+global Identifier: string | nil = Identifier or nil 
 
 global record TokenReq
     address: string
@@ -16,9 +16,7 @@ global record TokenReq
 end
 
 global record OrderBookReq
-    address: string
-    token_a: string
-    token_b: string
+  tokens: {string: boolean}
 end
 
 local record Tag
@@ -37,6 +35,7 @@ local record Msg
 end
 
 global SupportedTokens: {string: TokenReq} = SupportedTokens or {}
+-- orderboo address -> {[token_a] = true, [token_b] = true}
 global OrderBooks: {string: OrderBookReq} = OrderBooks or {}
 -- user address -> token address -> balance
 global AvailableBalances: {string: {string: Balance}} = AvailableBalances or {}
@@ -114,7 +113,8 @@ end
 
 local function requireOrderbookTokenAuth(orderbook_address: string, token_address: string)
   requireSupportedToken(token_address)
-  assert(OrderBooks[orderbook_address][token_address], "orderbook is not authorized to handle this token")
+  local ob = OrderBooks[orderbook_address]
+  assert(ob and ob.tokens and ob.tokens[token_address], "orderbook is not authorized to handle this token")
 end
 
 
