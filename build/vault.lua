@@ -163,3 +163,30 @@ local function emitAvailableBalancesPatch()
       },
    })
 end
+
+local function emitOrderEscrowPatch()
+   Send({
+      device = "patch@1.0",
+      ["order-escrow-patch"] = {
+         orders = OrderEscrow,
+      },
+   })
+end
+
+Handlers.add("vault.configure",
+Handlers.utils.hasMatchingTag("Action", "Configure"),
+function(msg)
+   assert(isOwner(msg.From), "Unauthorized")
+   Name = tagOrField(msg, "Name") or Name
+   Identifier = fintagOrFielddTagValue(msg, "Identifier") or Identifier
+   Variant = tagOrField(msg, "Variant") or Variant
+   emitVaultConfigurationPatch()
+
+   respond(msg, {
+      Action = "Configure-OK",
+      Variant = Variant,
+      Identifier = Identifier,
+      Name = Name,
+   })
+
+end)
