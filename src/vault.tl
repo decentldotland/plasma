@@ -13,6 +13,7 @@ global record TokenReq
     address: string
     decimals: number
     name: string
+    active: boolean
 end
 
 global record OrderBookReq
@@ -128,7 +129,7 @@ local function tagOrField(msg: Msg, name: string): string | nil
 end
 
 local function requireSupportedToken(address: string)
-    assert(SupportedTokens[address], "token not supported")
+    assert(SupportedTokens[address] and SupportedTokens[address].active, "token not supported")
 end
 
 local function requireSupportedOrderBook(address: string)
@@ -224,6 +225,7 @@ Handlers.add("vault.add_token_support",
       address = token,
       name = name,
       decimals = tonumber(decimals)
+      active = true
     }
 
     addAuthority(token)
@@ -233,6 +235,7 @@ Handlers.add("vault.add_token_support",
       Action = "AddTokenSupport-OK",
       TokenAddress = token,
       TokenName = name,
+      Active = true,
       TokenDecimals = tonumber(decimals),
     })
   end
