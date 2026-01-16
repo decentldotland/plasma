@@ -39,7 +39,8 @@ end
 global SupportedTokens: {string: TokenReq} = SupportedTokens or {}
 global OrderBooks: {string: OrderBookReq} = OrderBooks or {}
 -- user address -> token address -> balance
-global Balances: {string: {string: Balance}} = Balances or {}
+global AvailableBalances: {string: {string: Balance}} = AvailableBalances or {}
+global LockedBalances: {string: {string: Balance}} = LockedBalances or {}
 global Send: function(Payload): nil
 
 local function isOwner(sender: string): boolean
@@ -109,4 +110,43 @@ end
 
 local function requireSupportedOrderBook(address: string)
     assert(OrderBooks[address], "orderbook not supported")
+end
+
+local function requireOrderbookTokenAuth(orderbook_address: string, token_address: string)
+  requireSupportedToken(token_address)
+  assert(OrderBooks[orderbook_address][token_address], "orderbook is not authorized to handle this token")
+end
+
+
+local function emitVaultConfigurationPatch() 
+    Send({
+        device = "patch@1.0",
+        ["vault-configuration"] = {
+            name = Name,
+            variant = Variant,
+            identifier = Identifier,
+            supportedTokens = SupportedTokens,
+            orderBooks = OrderBooks
+        }
+    })
+end
+
+-- full emission, no deltas
+
+local function emitLockedBalancesPatch()
+  Send({
+    device = "patch@1.0",
+    ["locked-balances-patch"] = {
+      balances = LockedBalances
+    }
+  })
+end
+
+local function emitAvailableBalancesPatch()
+  Send({
+    device = "patch@1.0",
+    ["available-balances-patch"] = {
+      balances = AvailableBalances
+    }
+  })
 end

@@ -39,7 +39,8 @@ OrderBookReq = {}
 SupportedTokens = SupportedTokens or {}
 OrderBooks = OrderBooks or {}
 
-Balances = Balances or {}
+AvailableBalances = AvailableBalances or {}
+LockedBalances = LockedBalances or {}
 
 
 local function isOwner(sender)
@@ -109,4 +110,43 @@ end
 
 local function requireSupportedOrderBook(address)
    assert(OrderBooks[address], "orderbook not supported")
+end
+
+local function requireOrderbookTokenAuth(orderbook_address, token_address)
+   requireSupportedToken(token_address)
+   assert(OrderBooks[orderbook_address][token_address], "orderbook is not authorized to handle this token")
+end
+
+
+local function emitVaultConfigurationPatch()
+   Send({
+      device = "patch@1.0",
+      ["vault-configuration"] = {
+         name = Name,
+         variant = Variant,
+         identifier = Identifier,
+         supportedTokens = SupportedTokens,
+         orderBooks = OrderBooks,
+      },
+   })
+end
+
+
+
+local function emitLockedBalancesPatch()
+   Send({
+      device = "patch@1.0",
+      ["locked-balances-patch"] = {
+         balances = LockedBalances,
+      },
+   })
+end
+
+local function emitAvailableBalancesPatch()
+   Send({
+      device = "patch@1.0",
+      ["available-balances-patch"] = {
+         balances = AvailableBalances,
+      },
+   })
 end
