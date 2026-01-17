@@ -159,9 +159,9 @@ local function validateArweaveAddress(address: string)
 end
 
 local function requireOrderbookTokenAuth(orderbook_address: string, token_address: string)
-  requireSupportedToken(token_address)
+  requireActiveToken(token_address)
   local ob = OrderBooks[orderbook_address]
-  assert(ob and ob.tokens and ob.tokens[token_address], "orderbook is not authorized to handle this token")
+  assert(ob and ob.tokens and ob.active and ob.tokens[token_address], "orderbook is not authorized to handle this token")
 end
 
 local function ensureAccount(balanceMap: {string: {string: Balance}}, account: string)
@@ -460,7 +460,7 @@ Handlers.add("vault.credit_notice",
   end
   )
 
-  -- user withdraws from vault back to token process
+-- user withdraws from vault back to token process
 Handlers.add("vault.withdraw",
   Handlers.utils.hasMatchingTag("Action", "Withdraw"),
   function(msg: Msg)
@@ -512,7 +512,8 @@ Handlers.add("vault.withdraw",
   end
 )
 
-  -- finalize withdraw after token debit notice
+
+-- finalize withdraw after token debit notice
 Handlers.add("vault.debit_notice",
   Handlers.utils.hasMatchingTag("Action", "Debit-Notice"),
   function(msg: Msg)
@@ -542,6 +543,84 @@ Handlers.add("vault.debit_notice",
         Recipient = pending.recipient,
         Quantity = pending.quantity
       }
+    })
+  end
+)
+
+-- lock/unlock ledger operations
+
+Handlers.add("vault.lock",
+  Handlers.utils.hasMatchingTag("Action", "Lock"),
+  function(msg: Msg)
+    local order_id = tagOrField(msg, "OrderId")
+    local user = tagOrField(msg, "User")
+    local token = tagOrField(msg, "TokenAddress")
+    local quantity = tagOrField(msg, "Quantity")
+    local side = tagOrField(msg, "Side")
+
+    assert(order_id and order_id ~= "", "OrderId required")
+    validateArweaveAddress(user)
+    validateArweaveAddress(token)
+    validateArweaveAddress(order_id)
+    requireActiveOrderBook(msg.From)
+    requireOrderbookTokenAuth(msg.From, token)
+    requirePositive(quantity, "Lock quantity")
+
+    assert(not OrderEscrow[order_id], "order already escrowed")
+
+    -- move available -> locked
+    subAvailableBalances(user, token, quantity)
+    addLockedBalances(user, token, quantity)
+
+    OrderEscrow[order_id] = {
+      user = user,
+      token = token,
+      amount = quantity,
+      filled = "0",
+      side = side or "",
+      orderbook = msg.From
+    }
+
+    emitAvailableBalancesPatch()
+    emitLockedBalancesPatch()
+    emitOrderEscrowPatch()
+
+    respond(msg, {
+      Action = "Lock-OK",
+      OrderId = order_id
+    })
+  end
+)
+
+Handlers.add("vault.unlock",
+  Handlers.utils.hasMatchingTag("Action", "Unlock"),
+  function(msg: Msg)
+    local order_id = tagOrField(msg, "OrderId")
+
+    assert(order_id and order_id ~= "", "OrderId required")
+
+    local esc = OrderEscrow[order_id]
+    assert(esc, "order not escrowed")
+    assert(esc.orderbook == msg.From, "unauthorized orderbook")
+
+    -- remaining = amount - filled
+    local remaining = bint(esc.amount) - bint(esc.filled)
+    assert(remaining >= bint(0), "invalid escrow remaining")
+
+    if remaining > bint(0) then
+      subLockedBalances(esc.user, esc.token, tostring(remaining))
+      addAvailableBalances(esc.user, esc.token, tostring(remaining))
+    end
+
+    OrderEscrow[order_id] = nil
+
+    emitAvailableBalancesPatch()
+    emitLockedBalancesPatch()
+    emitOrderEscrowPatch()
+
+    respond(msg, {
+      Action = "Unlock-OK",
+      OrderId = order_id
     })
   end
 )
