@@ -170,6 +170,10 @@ local function ensureAccount(balanceMap: {string: {string: Balance}}, account: s
   end
 end
 
+local function ensureSenderIsOrderbook(orderbook: string, sender: string): nil
+  assert(orderbook == sender, "unauthorized orderbook")
+end
+
 -- ledger utils
 local function requirePositive(quantity: string, name: string)
   assert(quantity, name .. " is required")
@@ -620,6 +624,81 @@ Handlers.add("vault.unlock",
 
     respond(msg, {
       Action = "Unlock-OK",
+      OrderId = order_id
+    })
+  end
+)
+
+Handlers.add("vault.settle",
+  Handlers.utils.hasMatchingTag("Action", "Settle"),
+  function(msg: Msg)
+    local order_id = tagOrField(msg, "OrderId")
+    local recipient = tagOrField(msg, "Recipient")
+    local fill_qty = tagOrField(msg, "FillQuantity")
+
+    validateArweaveAddress(recipient)
+    validateArweaveAddress(order_id)
+    requirePositive(fill_qty, "FillQuantity")
+
+    local esc = OrderEscrow[order_id]
+    assert(esc, "order not escrowed")
+    ensureSenderIsOrderbook(esc.orderbook, msg.From)
+
+    local remaining = bint(esc.amount) - bint(esc.filled)
+    assert(bint(fill_qty) <= remaining, "fill exceeds escrow")
+
+    -- move locked -> recipient available
+    subLockedBalances(esc.user, esc.token, fill_qty)
+    addAvailableBalances(recipient, esc.token, fill_qty)
+
+    esc.filled = tostring(bint(esc.filled) + bint(fill_qty))
+
+    -- if fully filled, clear escrow
+    if bint(esc.filled) == bint(esc.amount) then
+      OrderEscrow[order_id] = nil
+    end
+
+    emitAvailableBalancesPatch()
+    emitLockedBalancesPatch()
+    emitOrderEscrowPatch()
+
+    respond(msg, {
+      Action = "Settle-OK",
+      OrderId = order_id,
+      Filled = fill_qty
+    })
+  end
+)
+
+-- settle/cancel orderbook ops on balances
+
+Handlers.add("vault.cancel",
+  Handlers.utils.hasMatchingTag("Action", "Cancel"),
+  function(msg: Msg)
+    local order_id = tagOrField(msg, "OrderId")
+
+    validateArweaveAddress(order_id)
+
+    local esc = OrderEscrow[order_id]
+    assert(esc, "order not escrowed")
+    ensureSenderIsOrderbook(esc.orderbook, msg.From)
+
+    local remaining = bint(esc.amount) - bint(esc.filled)
+    assert(remaining >= bint(0), "invalid escrow remaining")
+
+    if remaining > bint(0) then
+      subLockedBalances(esc.user, esc.token, tostring(remaining))
+      addAvailableBalances(esc.user, esc.token, tostring(remaining))
+    end
+
+    OrderEscrow[order_id] = nil
+
+    emitAvailableBalancesPatch()
+    emitLockedBalancesPatch()
+    emitOrderEscrowPatch()
+
+    respond(msg, {
+      Action = "Cancel-OK",
       OrderId = order_id
     })
   end
