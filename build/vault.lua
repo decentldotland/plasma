@@ -140,6 +140,10 @@ local function requireSupportedOrderBook(address)
    assert(OrderBooks[address], "orderbook not supported")
 end
 
+local function requireActiveOrderBook(address)
+   assert(OrderBooks[address] and OrderBooks[address].active, "orderbook not supported or not active")
+end
+
 local function validateArweaveAddress(address)
    assert(address ~= nil and address ~= "", "token address must be valid ao process id")
 end
@@ -148,6 +152,46 @@ local function requireOrderbookTokenAuth(orderbook_address, token_address)
    requireSupportedToken(token_address)
    local ob = OrderBooks[orderbook_address]
    assert(ob and ob.tokens and ob.tokens[token_address], "orderbook is not authorized to handle this token")
+end
+
+local function ensureAccount(balanceMap, account)
+   if not balanceMap[account] then
+      balanceMap[account] = {}
+   end
+end
+
+
+local function requirePositive(quantity, name)
+   assert(quantity, name .. " is required")
+   assert(bint.__lt(0, bint(quantity)), name .. " must be greater than 0")
+end
+
+local function addLockedBalances(account, token, quantity)
+   ensureAccount(LockedBalances, account)
+   requirePositive(quantity, "addLockedBalances")
+   LockedBalances[account][token] = tostring(bint(LockedBalances[account][token] or "0") + bint(quantity))
+end
+
+local function subLockedBalances(account, token, quantity)
+   ensureAccount(LockedBalances, account)
+   requirePositive(quantity, "subLockedBalances")
+   local nextValue = bint(LockedBalances[account][token] or "0") - bint(quantity)
+   assert(nextValue >= bint(0), "locked balance underflow")
+   LockedBalances[account][token] = tostring(nextValue)
+end
+
+local function addAvailableBalances(account, token, quantity)
+   ensureAccount(AvailableBalances, account)
+   requirePositive(quantity, "addAvailableBalances")
+   AvailableBalances[account][token] = tostring(bint(AvailableBalances[account][token] or "0") + bint(quantity))
+end
+
+local function subAvailableBalances(account, token, quantity)
+   ensureAccount(AvailableBalances, account)
+   requirePositive(quantity, "subAvailableBalances")
+   local nextValue = bint(AvailableBalances[account][token] or "0") - bint(quantity)
+   assert(nextValue >= bint(0), "available balance underflow")
+   AvailableBalances[account][token] = tostring(nextValue)
 end
 
 
@@ -295,6 +339,8 @@ function(msg)
    validateArweaveAddress(orderbook_address)
    requireSupportedOrderBook(orderbook_address)
 
+   local ob_before = OrderBooks[orderbook_address]
+
    if fee_bps ~= nil then
       assert(fee_bps ~= nil and fee_bps ~= "" and tonumber(fee_bps) >= 0, "invalid fee_bps param")
       OrderBooks[orderbook_address].fee_bps = tonumber(fee_bps)
@@ -302,7 +348,12 @@ function(msg)
 
    if active ~= nil then
       local status_bool = string.tolower(active) == "true"
+
+      if status_bool and not ob_before.active then
+         addAuthority(orderbook_address)
+      end
       OrderBooks[orderbook_address].active = status_bool
+
       if not status_bool then
          removeAuthority(orderbook_address)
       end
@@ -310,12 +361,13 @@ function(msg)
 
    emitVaultConfigurationPatch()
 
-   local ob = OrderBooks[orderbook_address]
+   local ob_after = OrderBooks[orderbook_address]
+
 
    respond(msg, {
       Action = "ConfigureOrderbook-OK",
-      FeeBps = ob.fee_bps,
-      Active = ob.active,
+      FeeBps = ob_after.fee_bps,
+      Active = ob_after.active,
       OrderbookAddress = orderbook_address,
    })
 end)
@@ -335,6 +387,8 @@ function(msg)
    validateArweaveAddress(token_address)
    requireSupportedToken(token_address)
 
+   local token_before = SupportedTokens[token_address]
+
    if token_name ~= nil and token_name ~= "" then
       SupportedTokens[token_address].name = token_name
    end
@@ -344,18 +398,24 @@ function(msg)
    end
 
    if token_active == "true" or token_active == "false" then
+      if token_active == "true" and not token_before.active then
+         addAuthority(token_address)
+      end
       SupportedTokens[token_address].active = token_active == "true"
+      if token_active == "false" then
+         removeAuthority(token_address)
+      end
    end
 
    emitVaultConfigurationPatch()
 
-   local token = SupportedTokens[token_address]
+   local token_after = SupportedTokens[token_address]
 
    respond(msg, {
       Action = "ConfigureToken-OK",
-      Name = token.name,
-      Active = token.active,
-      Decimals = token.decimals,
+      Name = token_after.name,
+      Active = token_after.active,
+      Decimals = token_after.decimals,
    })
 
 end)

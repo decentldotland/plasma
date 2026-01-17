@@ -154,6 +154,46 @@ local function requireOrderbookTokenAuth(orderbook_address: string, token_addres
   assert(ob and ob.tokens and ob.tokens[token_address], "orderbook is not authorized to handle this token")
 end
 
+local function ensureAccount(balanceMap: {string: {string: Balance}}, account: string)
+  if not balanceMap[account] then
+    balanceMap[account] = {}
+  end
+end
+
+-- ledger utils
+local function requirePositive(quantity: string, name: string)
+  assert(quantity, name .. " is required")
+  assert(bint.__lt(0, bint(quantity)), name .. " must be greater than 0")
+end
+
+local function addLockedBalances(account: string, token: string, quantity: string)
+  ensureAccount(LockedBalances, account)
+  requirePositive(quantity, "addLockedBalances")
+  LockedBalances[account][token] = tostring(bint(LockedBalances[account][token] or "0") + bint(quantity))
+end
+
+local function subLockedBalances(account: string, token: string, quantity: string)
+  ensureAccount(LockedBalances, account)
+  requirePositive(quantity, "subLockedBalances")
+  local nextValue = bint(LockedBalances[account][token] or "0") - bint(quantity)
+  assert(nextValue >= bint(0), "locked balance underflow")
+  LockedBalances[account][token] = tostring(nextValue)
+end
+
+local function addAvailableBalances(account: string, token: string, quantity: string)
+  ensureAccount(AvailableBalances, account)
+  requirePositive(quantity, "addAvailableBalances")
+  AvailableBalances[account][token] = tostring(bint(AvailableBalances[account][token] or "0") + bint(quantity))
+end
+
+local function subAvailableBalances(account: string, token: string, quantity: string)
+  ensureAccount(AvailableBalances, account)
+  requirePositive(quantity, "subAvailableBalances")
+  local nextValue = bint(AvailableBalances[account][token] or "0") - bint(quantity)
+  assert(nextValue >= bint(0), "available balance underflow")
+  AvailableBalances[account][token] = tostring(nextValue)
+end
+
 
 local function emitVaultConfigurationPatch() 
     Send({
