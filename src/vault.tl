@@ -31,6 +31,14 @@ global record OrderEscrowReq
   orderbook: string
 end
 
+global record PendingWithdrawReq
+  user: string
+  token: string
+  quantity: string
+  recipient: string
+  created: string
+end
+
 local record Tag
     name: string | nil
     Name: string | nil
@@ -54,6 +62,8 @@ global AvailableBalances: {string: {string: Balance}} = AvailableBalances or {}
 global LockedBalances: {string: {string: Balance}} = LockedBalances or {}
 -- order_id -> OrderEscrowReq
 global OrderEscrow: {string: OrderEscrowReq} = OrderEscrow or {}
+-- withdraw_id -> PendingWithdrawReq
+global PendingWithdrawals: {string: PendingWithdrawReq} = PendingWithdrawals or {}
 global Send: function(Payload): nil
 
 local function isOwner(sender: string): boolean
@@ -421,3 +431,117 @@ Handlers.add("vault.configure_token",
   end
   
   )
+
+-- deposit into the vault via Credit-Notice from token process
+Handlers.add("vault.credit_notice",
+  Handlers.utils.hasMatchingTag("Action", "Credit-Notice"),
+  function(msg: Msg)
+    local token = msg.From
+    local sender = tagOrField(msg, "Sender")
+    local quantity = tagOrField(msg, "Quantity")
+    local recipient = tagOrField(msg, "Recipient")
+
+    requireActiveToken(token)
+    validateArweaveAddress(sender)
+    requirePositive(quantity, "Deposit quantity")
+    if recipient ~= nil then
+      assert(recipient == ao.id, "invalid deposit recipient")
+    end
+
+    addAvailableBalances(sender, token, quantity)
+    emitAvailableBalancesPatch()
+
+    respond(msg, {
+      Action = "Deposit-OK",
+      TokenAddress = token,
+      Sender = sender,
+      Quantity = quantity,
+    })
+  end
+  )
+
+  -- user withdraws from vault back to token process
+Handlers.add("vault.withdraw",
+  Handlers.utils.hasMatchingTag("Action", "Withdraw"),
+  function(msg: Msg)
+    local token = tagOrField(msg, "TokenAddress")
+    local quantity = tagOrField(msg, "Quantity")
+    local recipient = tagOrField(msg, "Recipient") or msg.From
+
+    validateArweaveAddress(token)
+    validateArweaveAddress(recipient)
+    requireSupportedToken(token)
+    requirePositive(quantity, "Withdraw quantity")
+
+    subAvailableBalances(msg.From, token, quantity)
+    addLockedBalances(msg.From, token, quantity)
+
+    local withdraw_id = getMsgId(msg)
+    assert(withdraw_id ~= nil and withdraw_id ~= "", "withdraw_id unavailable")
+
+    PendingWithdrawals[withdraw_id] = {
+      user = msg.From,
+      token = token,
+      quantity = quantity,
+      recipient = recipient,
+      created = tostring(msg.Timestamp or "")
+    }
+
+    Send({
+      Target = token,
+      Action = "Transfer",
+      Tags = {
+        Recipient = recipient,
+        Quantity = quantity,
+        ["X-Withdraw-Id"] = withdraw_id,
+        ["X-Withdraw-User"] = msg.From,
+        ["X-Vault-Id"] = ao.id,
+       }
+    })
+
+    emitAvailableBalancesPatch()
+    emitLockedBalancesPatch()
+
+    respond(msg, {
+      Action = "Withdraw-Pending",
+      WithdrawId = withdraw_id,
+      TokenAddress = token,
+      Recipient = recipient,
+      Quantity = quantity,
+    })
+  end
+)
+
+  -- finalize withdraw after token debit notice
+Handlers.add("vault.debit_notice",
+  Handlers.utils.hasMatchingTag("Action", "Debit-Notice"),
+  function(msg: Msg)
+    local withdraw_id = tagOrField(msg, "X-Withdraw-Id")
+    local system_id = tagOrField(msg, "X-Vault-Id")
+    if not withdraw_id or system_id ~= ao.id then
+      return
+    end
+
+    local pending = PendingWithdrawals[withdraw_id]
+    if not pending then
+      return
+    end
+
+    assert(msg.From == pending.token, "invalid token for withdraw")
+
+    subLockedBalances(pending.user, pending.token, pending.quantity)
+    PendingWithdrawals[withdraw_id] = nil
+    emitLockedBalancesPatch()
+
+    Send({
+       Target = pending.user,
+      Action = "Withdraw-OK",
+      Tags = {
+        WithdrawId = withdraw_id,
+        TokenAddress = pending.token,
+        Recipient = pending.recipient,
+        Quantity = pending.quantity
+      }
+    })
+  end
+)
