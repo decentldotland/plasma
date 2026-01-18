@@ -1,4 +1,4 @@
-.PHONY: build check
+.PHONY: build check deploy vault
 
 build:
 	mkdir -p build
@@ -12,3 +12,14 @@ build:
 
 check:
 	tl check src/xbeam-bp.tl
+
+deploy:
+	@if [ "$(filter vault,$(MAKECMDGOALS))" = "vault" ]; then \
+		node scripts/vault/redeploy-vault.js; \
+	else \
+		echo "Usage: make deploy vault"; \
+		exit 1; \
+	fi
+
+vault:
+	@:
