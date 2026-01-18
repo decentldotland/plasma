@@ -1,0 +1,8 @@
+{
+  "name": "plasma",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@permaweb/aoconnect": "0.0.93"
+  }
+}

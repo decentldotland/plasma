@@ -1,0 +1,50 @@
+import { connect, createSigner } from "@permaweb/aoconnect";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const WALLET_PATH = path.join(__dirname, "..", "..", "wallet.json");
+const AO_URL = "https://push.forward.computer";
+const SCHEDULER = "n_XZJhUnmldNFo4dhajoPZWhBXuJk-OcQr5JQ49c4Zo";
+
+const VAULT_PROCESS = "VAULT_PROCESS_ID_HERE";
+const ORDERBOOK_PROCESS = "ORDERBOOK_PROCESS_ID_HERE";
+const TOKEN_A = "TOKEN_A_PROCESS_ID_HERE";
+const TOKEN_B = "TOKEN_B_PROCESS_ID_HERE";
+const FEE_BPS = "5";
+
+const wallet = JSON.parse(fs.readFileSync(WALLET_PATH, "utf-8"));
+const signer = createSigner(wallet);
+
+const ao = connect({
+  MODE: "mainnet",
+  URL: AO_URL,
+  SCHEDULER,
+  signer,
+});
+
+try {
+  const messageId = await ao.message({
+    process: VAULT_PROCESS,
+    signer,
+    tags: [
+      { name: "Action", value: "AddOrderbook" },
+      { name: "OrderbookAddress", value: ORDERBOOK_PROCESS },
+      { name: "TokenA", value: TOKEN_A },
+      { name: "TokenB", value: TOKEN_B },
+      { name: "FeeBps", value: FEE_BPS },
+    ],
+  });
+
+  const result = await ao.result({ process: VAULT_PROCESS, message: messageId });
+  console.log("AddOrderbook sent.", messageId);
+  console.log("Result:", JSON.stringify(result, null, 2));
+} catch (err) {
+  console.error("AddOrderbook failed.");
+  console.error(err);
+  if (err && err.cause) {
+    console.error("Cause:", err.cause);
+  }
+  process.exitCode = 1;
+}
