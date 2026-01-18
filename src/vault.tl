@@ -703,3 +703,5 @@ Handlers.add("vault.cancel",
     })
   end
 )
+
+-- todo: implement error API
