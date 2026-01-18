@@ -10,6 +10,22 @@ global type Price = string
 global type Qty = string
 local type Payload = {string: any}
 local type ReplyFn = function(Payload): nil
+global Send: function(Payload): nil
+
+local record Tag
+    name: string | nil
+    Name: string | nil
+    value: string | nil
+    Value: string | nil
+end
+
+local record Msg
+    From: string
+    Id: string | nil
+    Tags: {Tag} | {string: string} | nil
+    TagArray: {Tag} | nil
+    reply: ReplyFn | nil
+end
 
 global Variant: string = "0.1.0"
 global Name: string | nil = Name or nil
@@ -19,6 +35,7 @@ global TokenB: string | nil = TokenB or nil
 global Active: boolean | nil = Active or nil
 global BestBid: Price | nil = BestBid or nil
 global BestAsk: Price | nil = BestAsk or nil
+global FeeBps: string | nil = FeeBps or nil
 
 global record Order
     id: OrderId
@@ -90,3 +107,92 @@ global Stats: MarketStats = Stats or {
     high_24h = nil,
     low_24h = nil
 }
+
+local function isOwner(sender: string): boolean
+  return sender == Owner
+end
+
+local function addAuthority(id: string): nil
+  local a = ao.authorities or {}
+  for _, v in ipairs(a) do
+    if v == id then return end
+  end
+  table.insert(a, id)
+  ao.authorities = a
+  if SyncState then
+    SyncState(nil)
+  end
+end
+
+local function removeAuthority(id: string): nil
+    local a = ao.authorities or {}
+    for i = #a, 1, -1 do
+      if a[i] == id then
+        table.remove(a, i)
+      end
+    end
+    ao.authorities = a
+    if SyncState then SyncState(nil) end
+end
+
+local function respond(msg: Msg, payload: Payload)
+  if msg.reply then
+    msg.reply(payload)
+  else
+    payload.Target = msg.From
+    Send(payload)
+  end
+end
+
+local function getMsgId(msg: Msg): string | nil
+    return msg.Id
+end
+
+local function findTagValue(tags: {Tag} | nil, name: string): string | nil
+  if not tags then
+    return nil
+  end
+  local lower = string.lower(name)
+  if tags[1] then
+    for _, tag in ipairs(tags) do
+      local tagName = tag.name or tag.Name
+      if tagName and string.lower(tagName) == lower then
+        return tag.value or tag.Value
+      end
+    end
+  end
+  if tags[name] ~= nil then
+    return tags[name]
+  end
+  for k, v in pairs(tags) do
+    if type(k) == "string" and string.lower(k) == lower then
+      return v
+    end
+  end
+  return nil
+end
+
+local function tagOrField(msg: Msg, name: string): string | nil
+  local value = findTagValue(msg.Tags, name) or findTagValue(msg.TagArray, name)
+  if value ~= nil then
+    return value
+  end
+  return msg[name]
+end
+
+local function requirePositive(quantity: string, name: string): nil
+  assert(quantity, name .. " is required")
+  assert(bint.__lt(0, bint(quantity)), name .. " must be greater than 0")
+end
+
+local function validateArweaveAddress(address: string): nil
+  assert(address ~= nil and address ~= "", "token address must be valid ao process id")
+end
+
+local function requireActiveBook(): nil
+    assert(Active and Vault ~= nil, "Orderbook is inactive")
+end
+
+local function requireSupportedToken(address: string): nil
+    assert(address == TokenA or address == TokenB, "token not supported in this orderbook")
+end
