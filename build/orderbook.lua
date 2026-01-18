@@ -6,7 +6,6 @@ Side = {}
 OrderStatus = {}
 Price = {}
 Qty = {}
-
 Variant = "0.1.0"
 Name = Name or nil
 Vault = Vault or nil
@@ -29,7 +28,6 @@ Trades = Trades or {}
 BidPrices = BidPrices or {}
 AskPrices = AskPrices or {}
 MarketStats = {}
-
 Stats = Stats or {
    last_price = nil,
    vwap = nil,
@@ -125,4 +123,211 @@ end
 
 local function requireSupportedToken(address)
    assert(address == TokenA or address == TokenB, "token not supported in this orderbook")
+end
+
+local function requireValidSide(side)
+   assert(side == "Bid" or side == "Ask", "invalid side")
+end
+
+local function emitBestPricesPatch()
+   Send({
+      device = "patch@1.0",
+      ["best-prices-patch"] = {
+         BestBid = BestBid,
+         BestAsk = BestAsk,
+      },
+   })
+end
+
+local function getBook(side)
+   requireValidSide(side)
+   if side == "Bid" then
+      return Bids
+   end
+   return Asks
+end
+
+local function getPriceList(side)
+   requireValidSide(side)
+   if side == "Bid" then
+      return BidPrices
+   end
+   return AskPrices
+end
+
+local function updateBestPrices()
+   local newBestBid = BidPrices[1]
+   local newBestAsk = AskPrices[1]
+   if newBestBid == BestBid and newBestAsk == BestAsk then
+      return
+   end
+   BestBid = newBestBid
+   BestAsk = newBestAsk
+   emitBestPricesPatch()
+end
+
+local function addPrice(side, price)
+   requirePositive(price, "addPrice price")
+   local prices = getPriceList(side)
+
+   for _, existing in ipairs(prices) do
+      if existing == price then
+         return
+      end
+   end
+
+   local inserted = false
+   for i = 1, #prices do
+      if side == "Bid" then
+         if bint(price) > bint(prices[i]) then
+            table.insert(prices, i, price)
+            inserted = true
+            break
+         end
+      else
+         if bint(price) < bint(prices[i]) then
+            table.insert(prices, i, price)
+            inserted = true
+            break
+         end
+      end
+   end
+
+   if not inserted then
+      table.insert(prices, price)
+   end
+
+   updateBestPrices()
+end
+
+local function removePrice(side, price)
+   local prices = getPriceList(side)
+   for i = 1, #prices do
+      if prices[i] == price then
+         table.remove(prices, i)
+         break
+      end
+   end
+   updateBestPrices()
+end
+
+local function decreaseLevelQty(side, price, qty)
+   requirePositive(qty, "decreaseLevelQty qty")
+   local book = getBook(side)
+   local level = book[price]
+   if not level then
+      return
+   end
+
+   local nextValue = bint(level.total_qty) - bint(qty)
+   if nextValue < bint(0) then
+      nextValue = bint(0)
+   end
+   level.total_qty = tostring(nextValue)
+end
+
+local function enqueueOrder(side, price, orderId)
+   local book = getBook(side)
+   local order = Orders[orderId]
+   assert(order, "order not found")
+   assert(order.price == price, "price mismatch")
+   assert(order.side == side, "side mismatch")
+   requirePositive(order.remaining, "enqueueOrder remaining")
+
+   if not book[price] then
+      book[price] = {
+         price = price,
+         head = nil,
+         tail = nil,
+         count = 0,
+         total_qty = "0",
+      }
+      addPrice(side, price)
+   end
+
+   assert(not OrderNodes[orderId], "order already enqueued")
+
+   local level = book[price]
+   local node = { id = orderId, prev = level.tail, next = nil }
+
+   if level.tail then
+      OrderNodes[level.tail].next = orderId
+   else
+      level.head = orderId
+   end
+
+   level.tail = orderId
+   level.count = level.count + 1
+   level.total_qty = tostring(bint(level.total_qty) + bint(order.remaining))
+   OrderNodes[orderId] = node
+end
+
+local function dequeueOrder(side, price)
+   local book = getBook(side)
+   local level = book[price]
+   if not level or not level.head then
+      return nil
+   end
+
+   local orderId = level.head
+   local node = OrderNodes[orderId]
+   local nextId = node and node.next or nil
+
+   level.head = nextId
+   if nextId then
+      OrderNodes[nextId].prev = nil
+   else
+      level.tail = nil
+   end
+
+   level.count = level.count - 1
+   local order = Orders[orderId]
+   if order then
+      level.total_qty = tostring(bint(level.total_qty) - bint(order.remaining))
+   end
+   OrderNodes[orderId] = nil
+
+   if level.count <= 0 then
+      book[price] = nil
+      removePrice(side, price)
+   end
+
+   return orderId
+end
+
+local function removeOrderFromLevel(side, price, orderId)
+   local book = getBook(side)
+   local level = book[price]
+   if not level then
+      return
+   end
+
+   local node = OrderNodes[orderId]
+   if not node then
+      return
+   end
+
+   if node.prev then
+      OrderNodes[node.prev].next = node.next
+   else
+      level.head = node.next
+   end
+
+   if node.next then
+      OrderNodes[node.next].prev = node.prev
+   else
+      level.tail = node.prev
+   end
+
+   level.count = level.count - 1
+   local order = Orders[orderId]
+   if order then
+      level.total_qty = tostring(bint(level.total_qty) - bint(order.remaining))
+   end
+   OrderNodes[orderId] = nil
+
+   if level.count <= 0 then
+      book[price] = nil
+      removePrice(side, price)
+   end
 end

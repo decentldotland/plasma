@@ -201,6 +201,16 @@ local function requireValidSide(side: Side): nil
   assert(side == "Bid" or side == "Ask", "invalid side")
 end
 
+local function emitBestPricesPatch(): nil
+    Send({
+        device = "patch@1.0",
+        ["best-prices-patch"] = {
+            BestBid = BestBid,
+            BestAsk = BestAsk
+        }
+    })
+end
+
 local function getBook(side: Side): {Price: PriceLevel}
   requireValidSide(side)
   if side == "Bid" then
@@ -218,8 +228,14 @@ local function getPriceList(side: Side): {number: Price}
 end
 
 local function updateBestPrices(): nil
-  BestBid = BidPrices[1]
-  BestAsk = AskPrices[1]
+  local newBestBid = BidPrices[1]
+  local newBestAsk = AskPrices[1]
+  if newBestBid == BestBid and newBestAsk == BestAsk then
+    return
+  end
+  BestBid = newBestBid
+  BestAsk = newBestAsk
+  emitBestPricesPatch()
 end
 
 local function addPrice(side: Side, price: Price): nil
