@@ -1,3 +1,4 @@
 .env
 wallet.json
 node_modules/
+build-lua

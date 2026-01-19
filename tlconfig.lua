@@ -1,6 +1,10 @@
 return {
-  include = { "src/" },
-  build_dir = "build/",
+  source_dir = "src",
+  include_dir = { "src", "src/typedefs" },
+  include = {
+    "**/*.tl",
+  },
+  build_dir = "build-lua",
   lua_version = "5.1",
   warning_unused = true,
   gen_compat = "off",
@@ -9,5 +13,5 @@ return {
     Handlers = true,
     ao = true,
     Owner = true,
-  }
+  },
 }

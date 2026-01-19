@@ -1,10 +1,15 @@
 ## About
-A CLOB on AO written in Teal and compiled to Lua. MVP goal: a fully functional limit/market order CLOB with cross fills and a continuous price-time priority matching engine.
+A modular CLOB on AO written in Teal and compiled to Lua. MVP goal: a fully functional limit/market order CLOB with cross fills and a continuous price-time priority matching engine.
 
 ## Build processes
 
 ```bash
-make build
+make build # all processes
+
+## scopped
+
+make build-vault
+make build-orderbook
 ```
 
 ## Deploy processes

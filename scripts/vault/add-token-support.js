@@ -8,7 +8,7 @@ const WALLET_PATH = path.join(__dirname, "..", "..", "wallet.json");
 const AO_URL = "https://push.forward.computer";
 const SCHEDULER = "n_XZJhUnmldNFo4dhajoPZWhBXuJk-OcQr5JQ49c4Zo";
 
-const VAULT_PROCESS = "lGyEdo-A-SteggedVtk2IBxbzoSJY8Dt4IxCwyODdvc";
+const VAULT_PROCESS = "P-s1nKZ2jiHrno_EkUy05QEErfLgQcCFh8ltevAeLQs";
 // const TOKEN_PROCESS = "w5D3cwvC4Y9RCTy70BjyGFzTAjmUI0iOgdJbVyTeNvc";
 const TOKEN_PROCESS = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 const TOKEN_NAME = "PLASMAAAAAAAA";

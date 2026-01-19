@@ -8,7 +8,7 @@ const WALLET_PATH = path.join(__dirname, "..", "..", "wallet.json");
 const AO_URL = "https://push.forward.computer";
 const SCHEDULER = "n_XZJhUnmldNFo4dhajoPZWhBXuJk-OcQr5JQ49c4Zo";
 
-const VAULT_PROCESS = "lGyEdo-A-SteggedVtk2IBxbzoSJY8Dt4IxCwyODdvc";
+const VAULT_PROCESS = "P-s1nKZ2jiHrno_EkUy05QEErfLgQcCFh8ltevAeLQs";
 const VAULT_NAME = "plasma-vault";
 const VAULT_IDENTIFIER = "plasma-vault-1";
 const VAULT_VARIANT = "0.1.0";
