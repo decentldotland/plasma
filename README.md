@@ -20,5 +20,11 @@ make build-orderbook
 make deploy vault
 ```
 
+### orderbook
+
+```bash
+make deploy orderbook
+```
+
 ## License
 Plasma is licensed under the [BSL 1.1](./LICENSE) license
