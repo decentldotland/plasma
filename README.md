@@ -1,5 +1,7 @@
 ## About
-A modular CLOB on AO written in Teal and compiled to Lua. MVP goal: a fully functional limit/market order CLOB with cross fills and a continuous price-time priority matching engine.
+A modular, high-performance, CEX-grade, and onchain CLOB on AO mainnet - written in Teal and compiled to Lua. 
+
+MVP goal: a deterministic, modular-concerns-sandboxing, fully functional limit/market order CLOB with cross fills and a continuous price-time priority matching engine.
 
 ## Build processes
 
